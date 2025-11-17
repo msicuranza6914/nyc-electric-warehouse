@@ -206,3 +206,4 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 data_landing/electric_consumption_2010_2025_raw.csv
+Credentials/nyc-electric-project-957b64cb84bf.json
