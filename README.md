@@ -12,4 +12,5 @@ Primary dataset:
 Data dictionary:
 
 - Google Sheets data dictionary for this dataset:  
-  *(link stored in `https://docs.google.com/spreadsheets/d/1vooJbdeMJZrqSSc0F0L4R3slk6yiV2IGmsNolS8Q1VU/edit?gid=0#gid=0` in this repository).*
+  *(link stored in `https://docs.google.com/spreadsheets/d/1vooJbdeMJZrqSSc0F0L4R3slk6yiV2IGmsNolS8Q1VU/edit?gid=0#gid=0` in this repository).
+  
