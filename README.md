@@ -9,7 +9,7 @@ Primary dataset:
   CSV download (used by extraction script): https://data.cityofnewyork.us/api/views/jr24-e7cr/rows.csv?accessType=DOWNLOAD  
   Columns / data dictionary (API metadata): https://data.cityofnewyork.us/api/views/jr24-e7cr/columns.json
 
-Data dictionary:
+Data dictionary and Data Mapping:
 
 - Google Sheets data dictionary for this dataset:  
   *(link stored in `https://docs.google.com/spreadsheets/d/1vooJbdeMJZrqSSc0F0L4R3slk6yiV2IGmsNolS8Q1VU/edit?gid=0#gid=0` in this repository).
