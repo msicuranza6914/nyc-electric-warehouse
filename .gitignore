@@ -208,3 +208,4 @@ __marimo__/
 data_landing/electric_consumption_2010_2025_raw.csv
 Credentials/nyc-electric-project-957b64cb84bf.json
 Credentials/nyc-electric-project-bf1068ec7897.json
+gcp_credentials/*.json
