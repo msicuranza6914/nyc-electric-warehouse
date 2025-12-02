@@ -1,6 +1,3 @@
-from google.colab import auth
-auth.authenticate_user()
-
 from google.cloud import storage
 import pandas as pd
 import numpy as np
