@@ -1,95 +1,121 @@
-
---STAGING TABLE (loaded from GCS)
-
-CREATE TABLE IF NOT EXISTS `nyc-electric-project.nyc_electric_dw.electric_staging` (
-  BillDate_Std DATE,
-  `Service End Date` DATE,
-  Borough STRING,
-  `Development Name` STRING,
-  `TDS #` STRING,
-  `Consumption _KWH_` FLOAT64,
-  `Current Charges` FLOAT64
-
-);
-
- --DIMENSION TABLES
-
-
-CREATE TABLE IF NOT EXISTS `nyc-electric-project.nyc_electric_dw.dim_date` (
-  bill_date DATE,
-  bill_year INT64,
-  bill_quarter INT64,
-  bill_month INT64,
-  bill_day INT64
-);
-
-INSERT INTO `nyc-electric-project.nyc_electric_dw.dim_date` (
-  bill_date,
-  bill_year,
-  bill_quarter,
-  bill_month,
-  bill_day
-)
+-- Create dim_date
+CREATE OR REPLACE TABLE `nyc-electric-project.nyc_electric_dw.dim_date` AS
 SELECT DISTINCT
-  s.BillDate_Std AS bill_date,
-  EXTRACT(YEAR    FROM s.BillDate_Std) AS bill_year,
-  EXTRACT(QUARTER FROM s.BillDate_Std) AS bill_quarter,
-  EXTRACT(MONTH   FROM s.BillDate_Std) AS bill_month,
-  EXTRACT(DAY     FROM s.BillDate_Std) AS bill_day
-FROM `nyc-electric-project.nyc_electric_dw.electric_staging` AS s
-WHERE s.BillDate_Std IS NOT NULL;
+  CAST(FORMAT_DATE('%Y%m%d', BillDate_Std) AS INT64) AS date_key,  -- 20250115
+  BillDate_Std AS bill_date,
+  Bill_Year,
+  Bill_Quarter,
+  Bill_Month,
+  Bill_Day
+FROM `nyc-electric-project.nyc_electric_dw.electric_staging`
+WHERE BillDate_Std IS NOT NULL;
+-- Check the DimDate table
+SELECT *
+FROM `nyc-electric-project.nyc_electric_dw.dim_date`
+ORDER BY bill_date
+LIMIT 20;
 
-CREATE TABLE IF NOT EXISTS `nyc-electric-project.nyc_electric_dw.dim_development` (
-  development_name STRING,
-  borough STRING,
-  tds_number STRING
-);
-
-INSERT INTO `nyc-electric-project.nyc_electric_dw.dim_development` (
-  development_name,
-  borough,
-  tds_number
-)
+-- Create dim_development
+CREATE OR REPLACE TABLE `nyc-electric-project.nyc_electric_dw.dim_development` AS
 SELECT DISTINCT
-  s.`Development Name` AS development_name,
-  s.Borough            AS borough,
-  s.`TDS #`            AS tds_number
-FROM `nyc-electric-project.nyc_electric_dw.electric_staging` AS s
-WHERE s.`Development Name` IS NOT NULL;
+  ROW_NUMBER() OVER (
+    ORDER BY `Development Name`, Borough, `TDS #`
+  ) AS development_key,  -- surrogate key
 
+  `Development Name` AS development_name,
+  Borough,
+  `TDS #` AS tds_number,
+  `AMP #` AS amp_number,
+  `Funding Source` AS funding_source,
+  `RC Code` AS rc_code
 
+FROM `nyc-electric-project.nyc_electric_dw.electric_staging`
+WHERE `Development Name` IS NOT NULL;
 
--- FACT TABLES
+-- Check the dim_developmet table
+SELECT *
+FROM `nyc-electric-project.nyc_electric_dw.dim_development`
+ORDER BY development_key
+LIMIT 20;
 
-CREATE TABLE IF NOT EXISTS `nyc-electric-project.nyc_electric_dw.fact_borough_year_usage` (
-  bill_year INT64,
-  borough STRING,
-  total_kwh NUMERIC,
-  total_current_charges NUMERIC
-);
+-- Create dim_meter
+CREATE OR REPLACE TABLE `nyc-electric-project.nyc_electric_dw.dim_meter` AS
+SELECT DISTINCT
+  ROW_NUMBER() OVER (
+    ORDER BY `Meter Number`, `Meter AMR`, `Meter Scope`, Location
+  ) AS meter_key,   
 
-INSERT INTO `nyc-electric-project.nyc_electric_dw.fact_borough_year_usage` (
-  bill_year,
-  borough,
-  total_kwh,
-  total_current_charges
+  `Meter Number` AS meter_number,
+  `Meter AMR` AS meter_amr_type,
+  `Meter Scope` AS meter_scope,
+  Location
+
+FROM `nyc-electric-project.nyc_electric_dw.electric_staging`
+WHERE `Meter Number` IS NOT NULL;
+
+-- Check dim_meter table
+SELECT *
+FROM `nyc-electric-project.nyc_electric_dw.dim_meter`
+ORDER BY meter_key
+LIMIT 20;
+
+-- Create dim_vendor
+CREATE OR REPLACE TABLE `nyc-electric-project.nyc_electric_dw.dim_vendor` AS
+SELECT DISTINCT
+  ROW_NUMBER() OVER (
+    ORDER BY `Vendor Name`
+  ) AS vendor_key,   -- surrogate key
+
+  `Vendor Name` AS vendor_name
+
+FROM `nyc-electric-project.nyc_electric_dw.electric_staging`
+WHERE `Vendor Name` IS NOT NULL;
+
+-- Check dim_vendor
+SELECT *
+FROM `nyc-electric-project.nyc_electric_dw.dim_vendor`
+ORDER BY vendor_key
+LIMIT 20;
+
+-- Creat fact_borough_year_usage
+CREATE OR REPLACE TABLE `nyc-electric-project.nyc_electric_dw.fact_borough_year_usage` AS
+WITH joined AS (
+  SELECT
+    d.Bill_Year AS bill_year,
+    dev.Borough AS borough,
+    s.`Consumption _KWH_` AS kwh,
+    s.`Current Charges` AS current_charges
+  FROM `nyc-electric-project.nyc_electric_dw.electric_staging` AS s
+  LEFT JOIN `nyc-electric-project.nyc_electric_dw.dim_date` AS d
+    ON d.bill_date = s.BillDate_Std
+  LEFT JOIN `nyc-electric-project.nyc_electric_dw.dim_development` AS dev
+    ON dev.development_name = s.`Development Name`
+   AND dev.Borough = s.Borough
+   AND dev.tds_number = s.`TDS #`
+  WHERE d.Bill_Year IS NOT NULL
 )
 SELECT
-  CAST(d.bill_year AS INT64) AS bill_year,
-  dev.borough                 AS borough,
-  CAST(SUM(s.`Consumption _KWH_`) AS NUMERIC) AS total_kwh,
-  CAST(SUM(s.`Current Charges`)   AS NUMERIC) AS total_current_charges
-FROM `nyc-electric-project.nyc_electric_dw.electric_staging` AS s
-LEFT JOIN `nyc-electric-project.nyc_electric_dw.dim_date` AS d
-  ON d.bill_date = s.BillDate_Std
-LEFT JOIN `nyc-electric-project.nyc_electric_dw.dim_development` AS dev
-  ON dev.development_name = s.`Development Name`
- AND dev.borough          = s.Borough
- AND dev.tds_number       = s.`TDS #`
-WHERE CAST(d.bill_year AS INT64) >= 2020
+  bill_year,
+  borough,
+  SUM(kwh) AS total_kwh,
+  SUM(current_charges) AS total_current_charges
+FROM joined
+GROUP BY bill_year, borough
+ORDER BY bill_year, borough;
+
+-- Create eletric_staging
+CREATE OR REPLACE TABLE `nyc-electric-project.nyc_electric_dw.fact_borough_year_usage` AS
+SELECT
+  CAST(Bill_Year AS INT64)      AS bill_year,
+  Borough                       AS borough,
+  SUM(`Consumption _KWH_`)      AS total_kwh,
+  SUM(`Current Charges`)        AS total_current_charges
+FROM `nyc-electric-project.nyc_electric_dw.electric_staging`
+WHERE Bill_Year IS NOT NULL
 GROUP BY
   bill_year,
-  dev.borough
+  borough
 ORDER BY
   bill_year,
-  dev.borough;
+  borough;
+
